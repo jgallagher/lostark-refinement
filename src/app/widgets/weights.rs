@@ -4,26 +4,31 @@ use eframe::egui::{self, epaint, Ui, Vec2};
 #[derive(Debug, PartialEq)]
 pub(in crate::app) struct Preset {
     pub(in crate::app) name: &'static str,
-    success: [f64; 3],
-    fail: [f64; 3],
+    scoring: Scoring,
 }
 
+/*
 impl Preset {
     pub(in crate::app) fn equals(&self, scoring: &Scoring) -> bool {
-        self.success == scoring.success && self.fail == scoring.fail
+        self.scoring == scoring.success && self.fail == scoring.fail
     }
 }
+*/
 
 pub(in crate::app) const PRESETS: [Preset; 2] = [
     Preset {
         name: "Balanced; slightly prefer skill 1",
-        success: [1.1, 1.0, -1.0],
-        fail: [0.0, 0.0, 0.0],
+        scoring: Scoring {
+            success: [1.1, 1.0, -1.0],
+            fail: [0.0, 0.0, 0.0],
+        },
     },
     Preset {
         name: "Balanced; slightly prefer skill 2",
-        success: [1.0, 1.1, -1.0],
-        fail: [0.0, 0.0, 0.0],
+        scoring: Scoring {
+            success: [1.0, 1.1, -1.0],
+            fail: [0.0, 0.0, 0.0],
+        },
     },
 ];
 
@@ -88,8 +93,19 @@ fn show_textedit(ui: &mut Ui, s: &mut String) -> Option<f64> {
     }
 }
 
+fn parsed_fields_to_scoring(success: [Option<f64>; 3], fail: [Option<f64>; 3]) -> Option<Scoring> {
+    Some(Scoring {
+        success: [success[0]?, success[1]?, success[2]?],
+        fail: [fail[0]?, fail[1]?, fail[2]?],
+    })
+}
+
 impl Weights {
-    pub(in crate::app) fn show(&mut self, ui: &mut Ui) -> Option<Scoring> {
+    pub(in crate::app) fn show(
+        &mut self,
+        ui: &mut Ui,
+        selected_preset: &mut usize,
+    ) -> Option<Scoring> {
         let mut success = [None; 3];
         let mut fail = [None; 3];
         ui.heading("Weights");
@@ -107,16 +123,51 @@ impl Weights {
             }
         });
 
-        Some(Scoring {
-            success: [success[0]?, success[1]?, success[2]?],
-            fail: [fail[0]?, fail[1]?, fail[2]?],
-        })
+        let mut scoring = parsed_fields_to_scoring(success, fail);
+        if let Some(scoring) = scoring.as_ref() {
+            // Update presets combo box to match current weights
+            let mut found_preset = false;
+            for (i, preset) in PRESETS.iter().enumerate() {
+                if preset.scoring == *scoring {
+                    *selected_preset = i;
+                    found_preset = true;
+                    break;
+                }
+            }
+            if !found_preset {
+                *selected_preset = PRESETS.len();
+            }
+        }
+
+        ui.horizontal(|ui| {
+            ui.label("Presets");
+            let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
+                ui,
+                selected_preset,
+                PRESETS.len() + 1,
+                |i| {
+                    PRESETS
+                        .get(i)
+                        .map(|p| p.name.to_string())
+                        .unwrap_or_else(|| "Custom".to_string())
+                },
+            );
+            if resp.changed() {
+                println!("changed to {}", selected_preset);
+                if let Some(preset) = PRESETS.get(*selected_preset) {
+                    self.assign_to_preset(preset);
+                    scoring = Some(preset.scoring);
+                }
+            }
+        });
+
+        scoring
     }
 
     pub(in crate::app) fn assign_to_preset(&mut self, preset: &Preset) {
         for i in 0..3 {
-            self.success[i] = format!("{:.1}", preset.success[i]);
-            self.fail[i] = format!("{:.1}", preset.fail[i]);
+            self.success[i] = format!("{:.1}", preset.scoring.success[i]);
+            self.fail[i] = format!("{:.1}", preset.scoring.fail[i]);
         }
     }
 }

@@ -128,21 +128,8 @@ impl epi::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            let scoring = weights.show(ui);
+            let scoring = weights.show(ui, selected_preset);
             if let Some(scoring) = scoring {
-                // Update presets combo box to match current weights
-                let mut found_preset = false;
-                for (i, preset) in PRESET_WEIGHTS.iter().enumerate() {
-                    if preset.equals(&scoring) {
-                        *selected_preset = i;
-                        found_preset = true;
-                        break;
-                    }
-                }
-                if !found_preset {
-                    *selected_preset = PRESET_WEIGHTS.len();
-                }
-
                 // Update our & worker thread's scoring
                 if Some(scoring) != *current_scoring {
                     *current_scoring = Some(scoring);
@@ -150,26 +137,6 @@ impl epi::App for TemplateApp {
                 }
             }
 
-            ui.horizontal(|ui| {
-                ui.label("Presets");
-                let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
-                    ui,
-                    selected_preset,
-                    PRESET_WEIGHTS.len() + 1,
-                    |i| {
-                        PRESET_WEIGHTS
-                            .get(i)
-                            .map(|p| p.name.to_string())
-                            .unwrap_or_else(|| "Custom".to_string())
-                    },
-                );
-                if resp.changed() {
-                    println!("changed to {}", selected_preset);
-                    if let Some(preset) = PRESET_WEIGHTS.get(*selected_preset) {
-                        weights.assign_to_preset(preset);
-                    }
-                }
-            });
 
             /*
             ui.heading("eframe template");
