@@ -1,6 +1,5 @@
 use crate::app::solution::Scoring;
 use eframe::egui::{self, epaint, Ui, Vec2};
-use std::borrow::Cow;
 
 #[derive(Debug, PartialEq)]
 pub(in crate::app) struct Preset {

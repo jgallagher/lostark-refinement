@@ -5,6 +5,7 @@ mod solution;
 mod widgets;
 mod worker_thread;
 
+use self::solution::Scoring;
 use self::widgets::{Weights, PRESET_WEIGHTS};
 use self::worker_thread::ThreadHandle;
 
@@ -14,7 +15,11 @@ use self::worker_thread::ThreadHandle;
 pub struct TemplateApp {
     weights: Weights,
     selected_preset: usize,
+
     // this how you opt-out of serialization of a member
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    current_scoring: Option<Scoring>,
+
     #[cfg_attr(feature = "persistence", serde(skip))]
     worker_thread: Option<worker_thread::ThreadHandle>,
 }
@@ -24,6 +29,7 @@ impl Default for TemplateApp {
         Self {
             weights: Weights::default(),
             selected_preset: 0,
+            current_scoring: None,
             worker_thread: None,
         }
     }
@@ -55,7 +61,6 @@ impl epi::App for TemplateApp {
 
         // spawn worker thread
         let worker_thread = ThreadHandle::spawn(frame.repaint_signal());
-        worker_thread.request_update_state();
         self.worker_thread = Some(worker_thread);
     }
 
@@ -72,11 +77,11 @@ impl epi::App for TemplateApp {
         let Self {
             weights,
             selected_preset,
+            current_scoring,
             worker_thread,
         } = self;
 
         let worker_thread = worker_thread.as_ref().unwrap();
-        let worker_thread_state = worker_thread.current_state();
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -124,10 +129,11 @@ impl epi::App for TemplateApp {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
             let scoring = weights.show(ui);
-            if let Some(scoring) = scoring.as_ref() {
+            if let Some(scoring) = scoring {
+                // Update presets combo box to match current weights
                 let mut found_preset = false;
                 for (i, preset) in PRESET_WEIGHTS.iter().enumerate() {
-                    if preset.equals(scoring) {
+                    if preset.equals(&scoring) {
                         *selected_preset = i;
                         found_preset = true;
                         break;
@@ -135,6 +141,12 @@ impl epi::App for TemplateApp {
                 }
                 if !found_preset {
                     *selected_preset = PRESET_WEIGHTS.len();
+                }
+
+                // Update our & worker thread's scoring
+                if Some(scoring) != *current_scoring {
+                    *current_scoring = Some(scoring);
+                    worker_thread.update_weights(scoring);
                 }
             }
 
@@ -167,7 +179,6 @@ impl epi::App for TemplateApp {
                 "Source code."
             ));
             egui::warn_if_debug_build(ui);
-            */
             if ui
                 .add_enabled(
                     worker_thread_state.is_some(),
@@ -178,14 +189,11 @@ impl epi::App for TemplateApp {
                 println!("requesting state update");
                 worker_thread.request_update_state();
             }
+            */
         });
 
         egui::TopBottomPanel::bottom("bottom-panel").show(ctx, |ui| {
-            let label = match worker_thread_state {
-                Some(i) => format!("worker thread state = {}", i),
-                None => "worker thread thinking...".to_string(),
-            };
-            ui.label(label);
+            ui.label(worker_thread.status());
         });
 
         if false {

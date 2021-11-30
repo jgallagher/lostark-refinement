@@ -1,57 +1,72 @@
+use super::solution::{Scoring, Solution};
 use crossbeam_channel::{Receiver, Sender};
 use eframe::epi::RepaintSignal;
 use parking_lot::Mutex;
 use std::{sync::Arc, thread};
 
 pub(super) struct ThreadHandle {
-    state: Arc<Mutex<Option<u64>>>,
-    command_queue: Sender<Command>,
+    state: Arc<Mutex<Option<Solution>>>,
+    update_weights: Sender<Scoring>,
 }
 
 impl ThreadHandle {
     pub(super) fn spawn(repaint_signal: Arc<dyn RepaintSignal>) -> Self {
         let state = Arc::new(Mutex::new(None));
-        let (tx, rx) = crossbeam_channel::unbounded();
-        {
-            let state = Arc::clone(&state);
-            thread::spawn(move || run(state, rx, repaint_signal));
-        }
+        let (update_weights, update_weights_rx) = crossbeam_channel::unbounded();
+
+        let inner = Inner {
+            state: Arc::clone(&state),
+            update_weights: update_weights_rx,
+            repaint_signal,
+        };
+        thread::spawn(move || inner.run());
         Self {
             state,
-            command_queue: tx,
+            update_weights,
         }
     }
 
-    pub(super) fn request_update_state(&self) {
-        self.command_queue.send(Command::UpdateState).unwrap();
+    pub(super) fn status(&self) -> String {
+        let state = self.state.lock();
+        match state.as_ref() {
+            Some(solution) => format!("Solved ({} states)", solution.num_states()),
+            None => format!("Finding solution..."),
+        }
     }
 
-    pub(super) fn current_state(&self) -> Option<u64> {
-        *self.state.lock()
+    pub(super) fn update_weights(&self, scoring: Scoring) {
+        self.update_weights.send(scoring).unwrap();
     }
 }
 
-enum Command {
-    UpdateState,
-}
-
-fn run(
-    state: Arc<Mutex<Option<u64>>>,
-    commands: Receiver<Command>,
+struct Inner {
+    state: Arc<Mutex<Option<Solution>>>,
+    update_weights: Receiver<Scoring>,
     repaint_signal: Arc<dyn RepaintSignal>,
-) {
-    let mut i = 0;
-    for command in commands {
-        match command {
-            Command::UpdateState => {
-                *state.lock() = None;
+}
 
-                thread::sleep(std::time::Duration::from_secs(5));
-
-                *state.lock() = Some(i);
-                repaint_signal.request_repaint();
-                i += 1;
+impl Inner {
+    fn run(self) -> Result<(), crossbeam_channel::TryRecvError> {
+        loop {
+            crossbeam_channel::select! {
+                recv(self.update_weights) -> scoring => {
+                    self.rebuild_solution(scoring?);
+                }
             }
         }
+    }
+
+    fn rebuild_solution(&self, mut scoring: Scoring) {
+        // drain any queued up changes, only keeping the latest
+        while let Ok(s) = self.update_weights.try_recv() {
+            scoring = s;
+        }
+        println!("background thread received new scoring {:?}", scoring);
+        *self.state.lock() = None;
+
+        let new_solution = Solution::build(&scoring, 24); // TODO count from UI
+
+        *self.state.lock() = Some(new_solution);
+        self.repaint_signal.request_repaint();
     }
 }

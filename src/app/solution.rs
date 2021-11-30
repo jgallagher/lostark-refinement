@@ -59,7 +59,7 @@ impl State {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub(super) struct Scoring {
     pub(super) success: [f64; 3],
     pub(super) fail: [f64; 3],
@@ -90,6 +90,10 @@ impl Solution {
         };
         this.build_impl(scoring);
         this
+    }
+
+    pub(super) fn num_states(&self) -> usize {
+        self.optimal.len()
     }
 
     fn build_impl(&mut self, scoring: &Scoring) {
