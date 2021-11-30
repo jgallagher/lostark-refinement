@@ -6,7 +6,7 @@ mod widgets;
 mod worker_thread;
 
 use self::solution::Scoring;
-use self::widgets::{Weights, PRESET_WEIGHTS};
+use self::widgets::{Simulation, Weights};
 use self::worker_thread::ThreadHandle;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -15,6 +15,8 @@ use self::worker_thread::ThreadHandle;
 pub struct TemplateApp {
     weights: Weights,
     selected_preset: usize,
+    simulation: Simulation,
+    sim_tries: Option<u32>,
 
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -29,6 +31,8 @@ impl Default for TemplateApp {
         Self {
             weights: Weights::default(),
             selected_preset: 0,
+            simulation: Simulation::default(),
+            sim_tries: None,
             current_scoring: None,
             worker_thread: None,
         }
@@ -54,13 +58,11 @@ impl epi::App for TemplateApp {
             *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
         }
 
-        // sanity check selected preset
-        if self.selected_preset > PRESET_WEIGHTS.len() + 1 {
-            self.selected_preset = 0;
-        }
-
         // spawn worker thread
         let worker_thread = ThreadHandle::spawn(frame.repaint_signal());
+        if let Some(sim_tries) = self.sim_tries {
+            worker_thread.update_sim_tries(sim_tries);
+        }
         self.worker_thread = Some(worker_thread);
     }
 
@@ -77,6 +79,8 @@ impl epi::App for TemplateApp {
         let Self {
             weights,
             selected_preset,
+            simulation,
+            sim_tries,
             current_scoring,
             worker_thread,
         } = self;
@@ -128,15 +132,26 @@ impl epi::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            let scoring = weights.show(ui, selected_preset);
-            if let Some(scoring) = scoring {
-                // Update our & worker thread's scoring
-                if Some(scoring) != *current_scoring {
-                    *current_scoring = Some(scoring);
-                    worker_thread.update_weights(scoring);
-                }
-            }
+            ui.horizontal(|ui| {
+                ui.group(|ui| {
+                    let scoring = weights.show(ui, selected_preset);
+                    if let Some(scoring) = scoring {
+                        // Update our & worker thread's scoring
+                        if Some(scoring) != *current_scoring {
+                            *current_scoring = Some(scoring);
+                            worker_thread.update_weights(scoring);
+                        }
+                    }
+                });
 
+                ui.group(|ui| {
+                    let tries = simulation.show(ui, worker_thread.sim_results());
+                    if Some(tries) != *sim_tries {
+                        *sim_tries = Some(tries);
+                        worker_thread.update_sim_tries(tries);
+                    }
+                });
+            });
 
             /*
             ui.heading("eframe template");

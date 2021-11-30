@@ -2,20 +2,12 @@ use crate::app::solution::Scoring;
 use eframe::egui::{self, epaint, Ui, Vec2};
 
 #[derive(Debug, PartialEq)]
-pub(in crate::app) struct Preset {
-    pub(in crate::app) name: &'static str,
+struct Preset {
+    name: &'static str,
     scoring: Scoring,
 }
 
-/*
-impl Preset {
-    pub(in crate::app) fn equals(&self, scoring: &Scoring) -> bool {
-        self.scoring == scoring.success && self.fail == scoring.fail
-    }
-}
-*/
-
-pub(in crate::app) const PRESETS: [Preset; 2] = [
+const PRESETS: [Preset; 6] = [
     Preset {
         name: "Balanced; slightly prefer skill 1",
         scoring: Scoring {
@@ -28,6 +20,34 @@ pub(in crate::app) const PRESETS: [Preset; 2] = [
         scoring: Scoring {
             success: [1.0, 1.1, -1.0],
             fail: [0.0, 0.0, 0.0],
+        },
+    },
+    Preset {
+        name: "Maximize skill 1",
+        scoring: Scoring {
+            success: [100.0, 1.0, -1.0],
+            fail: [0.0, 0.0, 0.0],
+        },
+    },
+    Preset {
+        name: "Maximize skill 2",
+        scoring: Scoring {
+            success: [1.0, 100.0, -1.0],
+            fail: [0.0, 0.0, 0.0],
+        },
+    },
+    Preset {
+        name: "Minimize debuff; slightly prefer skill 1",
+        scoring: Scoring {
+            success: [1.1, 1.0, -100.0],
+            fail: [0.0, 0.0, 100.0],
+        },
+    },
+    Preset {
+        name: "Minimize debuff; slightly prefer skill 2",
+        scoring: Scoring {
+            success: [1.0, 1.1, -100.0],
+            fail: [0.0, 0.0, 100.0],
         },
     },
 ];
@@ -106,65 +126,68 @@ impl Weights {
         ui: &mut Ui,
         selected_preset: &mut usize,
     ) -> Option<Scoring> {
-        let mut success = [None; 3];
-        let mut fail = [None; 3];
-        ui.heading("Weights");
-        egui::Grid::new("weights-grid").show(ui, |ui| {
-            ui.label("");
-            ui.label("Success");
-            ui.label("Fail");
-            ui.end_row();
-
-            for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
-                ui.label(s);
-                success[i] = show_textedit(ui, &mut self.success[i]);
-                fail[i] = show_textedit(ui, &mut self.fail[i]);
+        let mut scoring = None;
+        ui.vertical(|ui| {
+            let mut success = [None; 3];
+            let mut fail = [None; 3];
+            ui.heading("Weights");
+            egui::Grid::new("weights-grid").show(ui, |ui| {
+                ui.label("");
+                ui.label("Success");
+                ui.label("Fail");
                 ui.end_row();
-            }
-        });
 
-        let mut scoring = parsed_fields_to_scoring(success, fail);
-        if let Some(scoring) = scoring.as_ref() {
-            // Update presets combo box to match current weights
-            let mut found_preset = false;
-            for (i, preset) in PRESETS.iter().enumerate() {
-                if preset.scoring == *scoring {
-                    *selected_preset = i;
-                    found_preset = true;
-                    break;
+                for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
+                    ui.label(s);
+                    success[i] = show_textedit(ui, &mut self.success[i]);
+                    fail[i] = show_textedit(ui, &mut self.fail[i]);
+                    ui.end_row();
+                }
+            });
+
+            scoring = parsed_fields_to_scoring(success, fail);
+            if let Some(scoring) = scoring.as_ref() {
+                // Update presets combo box to match current weights
+                let mut found_preset = false;
+                for (i, preset) in PRESETS.iter().enumerate() {
+                    if preset.scoring == *scoring {
+                        *selected_preset = i;
+                        found_preset = true;
+                        break;
+                    }
+                }
+                if !found_preset {
+                    *selected_preset = PRESETS.len();
                 }
             }
-            if !found_preset {
-                *selected_preset = PRESETS.len();
-            }
-        }
 
-        ui.horizontal(|ui| {
-            ui.label("Presets");
-            let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
-                ui,
-                selected_preset,
-                PRESETS.len() + 1,
-                |i| {
-                    PRESETS
-                        .get(i)
-                        .map(|p| p.name.to_string())
-                        .unwrap_or_else(|| "Custom".to_string())
-                },
-            );
-            if resp.changed() {
-                println!("changed to {}", selected_preset);
-                if let Some(preset) = PRESETS.get(*selected_preset) {
-                    self.assign_to_preset(preset);
-                    scoring = Some(preset.scoring);
+            ui.horizontal(|ui| {
+                ui.label("Presets");
+                let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
+                    ui,
+                    selected_preset,
+                    PRESETS.len() + 1,
+                    |i| {
+                        PRESETS
+                            .get(i)
+                            .map(|p| p.name.to_string())
+                            .unwrap_or_else(|| "Custom".to_string())
+                    },
+                );
+                if resp.changed() {
+                    println!("changed to {}", selected_preset);
+                    if let Some(preset) = PRESETS.get(*selected_preset) {
+                        self.assign_to_preset(preset);
+                        scoring = Some(preset.scoring);
+                    }
                 }
-            }
+            });
         });
 
         scoring
     }
 
-    pub(in crate::app) fn assign_to_preset(&mut self, preset: &Preset) {
+    fn assign_to_preset(&mut self, preset: &Preset) {
         for i in 0..3 {
             self.success[i] = format!("{:.1}", preset.scoring.success[i]);
             self.fail[i] = format!("{:.1}", preset.scoring.fail[i]);

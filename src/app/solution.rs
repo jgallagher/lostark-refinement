@@ -78,17 +78,19 @@ impl Scoring {
 
 #[derive(Debug)]
 pub(super) struct Solution {
+    scoring: Scoring,
     optimal: FnvHashMap<State, Answer>,
     count: u8,
 }
 
 impl Solution {
-    pub(super) fn build(scoring: &Scoring, count: u8) -> Self {
+    pub(super) fn build(scoring: Scoring, count: u8) -> Self {
         let mut this = Self {
+            scoring,
             optimal: FnvHashMap::default(),
             count,
         };
-        this.build_impl(scoring);
+        this.build_impl();
         this
     }
 
@@ -96,7 +98,7 @@ impl Solution {
         self.optimal.len()
     }
 
-    fn build_impl(&mut self, scoring: &Scoring) {
+    fn build_impl(&mut self) {
         let mut remaining = [0, 0, 0];
         loop {
             for chance in ALL_CHANCES {
@@ -118,8 +120,8 @@ impl Solution {
                     let success_answer = self.lookup(&success_state);
                     let fail_answer = self.lookup(&fail_state);
 
-                    let score = prob_success * (scoring.success[index] + success_answer.score)
-                        + prob_fail * (scoring.fail[index] + fail_answer.score);
+                    let score = prob_success * (self.scoring.success[index] + success_answer.score)
+                        + prob_fail * (self.scoring.fail[index] + fail_answer.score);
 
                     scores.push(Answer { index, score });
                 }
@@ -162,6 +164,34 @@ impl Solution {
             index: usize::MAX,
             score: 0.0,
         }
+    }
+
+    pub(super) fn simulate_once(&self, rng: &mut ThreadRng) -> [u8; 3] {
+        let mut state = State::new(self.count);
+        let mut scores = [0; 3];
+
+        while !state.available_choices().is_empty() {
+            let best = self.lookup(&state);
+            /*
+            println!(
+                "{:.2} {:?} -> {} ({})",
+                state.chance.as_f64(),
+                state.remaining,
+                best.index,
+                best.score
+            );
+            */
+            let success = state.update(best.index, rng);
+            if success {
+                scores[best.index] += 1;
+            }
+        }
+
+        scores
+    }
+
+    pub(super) fn eval_result(&self, result: [u8; 3]) -> f64 {
+        self.scoring.eval(result, self.count)
     }
 }
 
