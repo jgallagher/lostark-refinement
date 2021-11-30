@@ -1,15 +1,18 @@
 use eframe::{egui, epi};
 
-use self::worker_thread::ThreadHandle;
-
+mod chance;
+mod solution;
+mod widgets;
 mod worker_thread;
+
+use self::widgets::{Weights, PRESET_WEIGHTS};
+use self::worker_thread::ThreadHandle;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     weights: Weights,
-    presets: Vec<u64>,
     selected_preset: usize,
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -20,25 +23,8 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             weights: Weights::default(),
-            presets: vec![100, 200, 300],
             selected_preset: 0,
             worker_thread: None,
-        }
-    }
-}
-
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-struct Weights {
-    success: [String; 3],
-    fail: [String; 3],
-}
-
-impl Default for Weights {
-    fn default() -> Self {
-        Self {
-            success: ["1.0".to_string(), "1.5".to_string(), "-1.0".to_string()],
-            fail: ["-1.0".to_string(), "-1.0".to_string(), "0.0".to_string()],
         }
     }
 }
@@ -61,6 +47,13 @@ impl epi::App for TemplateApp {
         if let Some(storage) = _storage {
             *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
         }
+
+        // sanity check selected preset
+        if self.selected_preset > PRESET_WEIGHTS.len() + 1 {
+            self.selected_preset = 0;
+        }
+
+        // spawn worker thread
         let worker_thread = ThreadHandle::spawn(frame.repaint_signal());
         worker_thread.request_update_state();
         self.worker_thread = Some(worker_thread);
@@ -78,7 +71,6 @@ impl epi::App for TemplateApp {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
         let Self {
             weights,
-            presets,
             selected_preset,
             worker_thread,
         } = self;
@@ -131,30 +123,39 @@ impl epi::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.heading("Weights");
-            egui::Grid::new("weights-grid").show(ui, |ui| {
-                ui.label("");
-                ui.label("Success");
-                ui.label("Fail");
-                ui.end_row();
-
-                for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
-                    ui.label(s);
-                    ui.text_edit_singleline(&mut weights.success[i]);
-                    ui.text_edit_singleline(&mut weights.fail[i]);
-                    ui.end_row();
+            let scoring = weights.show(ui);
+            if let Some(scoring) = scoring.as_ref() {
+                let mut found_preset = false;
+                for (i, preset) in PRESET_WEIGHTS.iter().enumerate() {
+                    if preset.equals(scoring) {
+                        *selected_preset = i;
+                        found_preset = true;
+                        break;
+                    }
                 }
-            });
+                if !found_preset {
+                    *selected_preset = PRESET_WEIGHTS.len();
+                }
+            }
+
             ui.horizontal(|ui| {
                 ui.label("Presets");
                 let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
                     ui,
                     selected_preset,
-                    presets.len(),
-                    |i| presets[i].to_string(),
+                    PRESET_WEIGHTS.len() + 1,
+                    |i| {
+                        PRESET_WEIGHTS
+                            .get(i)
+                            .map(|p| p.name.to_string())
+                            .unwrap_or_else(|| "Custom".to_string())
+                    },
                 );
                 if resp.changed() {
                     println!("changed to {}", selected_preset);
+                    if let Some(preset) = PRESET_WEIGHTS.get(*selected_preset) {
+                        weights.assign_to_preset(preset);
+                    }
                 }
             });
 

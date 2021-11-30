@@ -10,9 +10,12 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-eframe = "0.15.0" # Gives us egui, epi and web+native backends
+arrayvec = "0.7"
 crossbeam-channel = "0.5"
+eframe = "0.15.0" # Gives us egui, epi and web+native backends
+fnv = "1.0"
 parking_lot = "0.11"
+rand = "0.8"
 
 serde = { version = "1", features = ["derive"], optional = true }
 
