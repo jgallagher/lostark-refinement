@@ -141,15 +141,37 @@ impl epi::App for TemplateApp {
                         .with_main_justify(true)
                         .with_cross_align(egui::Align::Min),
                     |ui| {
-                        ui.group(|ui| {
-                            let scoring = weights.show(ui, selected_preset);
-                            if let Some(scoring) = scoring {
-                                // Update our & worker thread's scoring
-                                if Some(scoring) != *current_scoring {
-                                    *current_scoring = Some(scoring);
-                                    worker_thread.update_weights(scoring);
+                        egui::Grid::new("weights-help").show(ui, |ui| {
+                            ui.group(|ui| {
+                                let scoring = weights.show(ui, selected_preset);
+                                if let Some(scoring) = scoring {
+                                    // Update our & worker thread's scoring
+                                    if Some(scoring) != *current_scoring {
+                                        *current_scoring = Some(scoring);
+                                        worker_thread.update_weights(scoring);
+                                    }
                                 }
-                            }
+                            });
+                            ui.end_row();
+
+                            ui.group(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.heading("Help / About");
+                                    ui.label("\u{2022} Set point values for success/failure for each row in `Weights`");
+                                    ui.label("  above");
+                                    ui.label("\u{2022} Reported scores are the expected values based on current");
+                                    ui.label("  progress and chosen weights");
+                                    ui.label("\u{2022} Follow the suggested selections (green highlit skill)");
+                                    ui.label("\u{2022} Update the top section with the in-game result (+1 or failure)");
+                                    ui.label("\u{2022} The right section shows the 10 most probable final outcomes");
+                                    ui.horizontal(|ui| {
+                                        ui.spacing_mut().item_spacing.x = 0.0;
+                                        ui.label("\u{2022} Problems/suggestions/question? Open an ");
+                                        ui.hyperlink_to("issue", "https://github.com/jgallagher/lostark-refinement/issues");
+                                    });
+                                });
+                            });
+                            ui.end_row();
                         });
 
                         ui.group(|ui| {
