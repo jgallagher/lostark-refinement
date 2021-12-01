@@ -56,7 +56,7 @@ impl Default for TemplateApp {
 
 impl epi::App for TemplateApp {
     fn name(&self) -> &str {
-        "eframe template"
+        "Lost Ark Ability Stone Refinement Optimizer"
     }
 
     /// Called once before the first frame.
