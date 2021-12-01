@@ -1,3 +1,4 @@
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum Chance {
     TwentyFive,
@@ -39,6 +40,17 @@ impl Chance {
             Chance::FiftyFive => 0.55,
             Chance::SixtyFive => 0.65,
             Chance::SeventyFive => 0.75,
+        }
+    }
+
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Chance::TwentyFive => "25%",
+            Chance::ThirtyFive => "35%",
+            Chance::FourtyFive => "45%",
+            Chance::FiftyFive => "55%",
+            Chance::SixtyFive => "65%",
+            Chance::SeventyFive => "75%",
         }
     }
 }

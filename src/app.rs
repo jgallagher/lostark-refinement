@@ -6,7 +6,7 @@ mod widgets;
 mod worker_thread;
 
 use self::solution::Scoring;
-use self::widgets::{Simulation, Weights};
+use self::widgets::{GameState, Simulation, Weights};
 use self::worker_thread::ThreadHandle;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -17,6 +17,7 @@ pub struct TemplateApp {
     selected_preset: usize,
     simulation: Simulation,
     sim_tries: Option<u32>,
+    game_state: GameState,
 
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -33,6 +34,7 @@ impl Default for TemplateApp {
             selected_preset: 0,
             simulation: Simulation::default(),
             sim_tries: None,
+            game_state: GameState::default(),
             current_scoring: None,
             worker_thread: None,
         }
@@ -81,6 +83,7 @@ impl epi::App for TemplateApp {
             selected_preset,
             simulation,
             sim_tries,
+            game_state,
             current_scoring,
             worker_thread,
         } = self;
@@ -132,24 +135,30 @@ impl epi::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.horizontal(|ui| {
-                ui.group(|ui| {
-                    let scoring = weights.show(ui, selected_preset);
-                    if let Some(scoring) = scoring {
-                        // Update our & worker thread's scoring
-                        if Some(scoring) != *current_scoring {
-                            *current_scoring = Some(scoring);
-                            worker_thread.update_weights(scoring);
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.group(|ui| {
+                        let scoring = weights.show(ui, selected_preset);
+                        if let Some(scoring) = scoring {
+                            // Update our & worker thread's scoring
+                            if Some(scoring) != *current_scoring {
+                                *current_scoring = Some(scoring);
+                                worker_thread.update_weights(scoring);
+                            }
                         }
-                    }
+                    });
+
+                    ui.group(|ui| {
+                        let tries = simulation.show(ui, worker_thread.sim_results());
+                        if Some(tries) != *sim_tries {
+                            *sim_tries = Some(tries);
+                            worker_thread.update_sim_tries(tries);
+                        }
+                    });
                 });
 
                 ui.group(|ui| {
-                    let tries = simulation.show(ui, worker_thread.sim_results());
-                    if Some(tries) != *sim_tries {
-                        *sim_tries = Some(tries);
-                        worker_thread.update_sim_tries(tries);
-                    }
+                    game_state.show(ui);
                 });
             });
 

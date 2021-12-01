@@ -11,7 +11,7 @@ pub(super) struct Answer {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct State {
+struct State {
     pub(super) chance: Chance,
     pub(super) remaining: [u8; 3],
 }
@@ -151,7 +151,7 @@ impl Solution {
         }
     }
 
-    pub(super) fn lookup(&self, state: &State) -> Answer {
+    fn lookup(&self, state: &State) -> Answer {
         if let Some(answer) = self.optimal.get(&state) {
             return *answer;
         }
@@ -172,15 +172,6 @@ impl Solution {
 
         while !state.available_choices().is_empty() {
             let best = self.lookup(&state);
-            /*
-            println!(
-                "{:.2} {:?} -> {} ({})",
-                state.chance.as_f64(),
-                state.remaining,
-                best.index,
-                best.score
-            );
-            */
             let success = state.update(best.index, rng);
             if success {
                 scores[best.index] += 1;
