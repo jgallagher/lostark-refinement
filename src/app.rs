@@ -112,7 +112,17 @@ impl epi::App for TemplateApp {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
             ui.vertical(|ui| {
-                ui.horizontal(|ui| {
+                ui.group(|ui| {
+                    let prev_state = game_state.clone();
+                    game_state.show(ui, worker_thread.sorted_choices(&prev_state));
+                    if prev_state != *game_state {
+                        worker_thread.update_game_state(game_state.clone());
+                    }
+                });
+
+                //ui.horizontal(|ui| {
+                //ui.with_layout(egui::Layout::top_down_justified(egui::Align::Center), |ui| {
+                ui.with_layout(egui::Layout::left_to_right().with_main_justify(true).with_cross_align(egui::Align::Min), |ui| {
                     ui.group(|ui| {
                         let scoring = weights.show(ui, selected_preset);
                         if let Some(scoring) = scoring {
@@ -131,14 +141,6 @@ impl epi::App for TemplateApp {
                             worker_thread.update_sim_tries(tries);
                         }
                     });
-                });
-
-                ui.group(|ui| {
-                    let prev_state = game_state.clone();
-                    game_state.show(ui, worker_thread.sorted_choices(&prev_state));
-                    if prev_state != *game_state {
-                        worker_thread.update_game_state(game_state.clone());
-                    }
                 });
             });
         });

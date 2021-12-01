@@ -98,6 +98,7 @@ const HIGHLIGHT_FRAME: egui::Frame = egui::Frame {
 impl GameState {
     pub(in crate::app) fn show(&mut self, ui: &mut Ui, choices: Option<ArrayVec<Answer, 3>>) {
         ui.vertical(|ui| {
+            ui.heading("Lost Ark Ability Stone Refinement Optimizer");
             ui.horizontal(|ui| {
                 ui.label("Success Chance:");
                 egui::ComboBox::from_id_source("success-chance-combo")

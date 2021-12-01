@@ -131,19 +131,21 @@ impl Weights {
             let mut success = [None; 3];
             let mut fail = [None; 3];
             ui.heading("Weights");
-            egui::Grid::new("weights-grid").show(ui, |ui| {
-                ui.label("");
-                ui.label("Success");
-                ui.label("Fail");
-                ui.end_row();
-
-                for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
-                    ui.label(s);
-                    success[i] = show_textedit(ui, &mut self.success[i]);
-                    fail[i] = show_textedit(ui, &mut self.fail[i]);
+            egui::Grid::new("weights-grid")
+                .min_col_width(72.0)
+                .show(ui, |ui| {
+                    ui.label("");
+                    ui.label("Success");
+                    ui.label("Fail");
                     ui.end_row();
-                }
-            });
+
+                    for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
+                        ui.label(s);
+                        success[i] = show_textedit(ui, &mut self.success[i]);
+                        fail[i] = show_textedit(ui, &mut self.fail[i]);
+                        ui.end_row();
+                    }
+                });
 
             scoring = parsed_fields_to_scoring(success, fail);
             if let Some(scoring) = scoring.as_ref() {
@@ -163,17 +165,14 @@ impl Weights {
 
             ui.horizontal(|ui| {
                 ui.label("Presets");
-                let resp = egui::ComboBox::from_id_source("presets-combo").show_index(
-                    ui,
-                    selected_preset,
-                    PRESETS.len() + 1,
-                    |i| {
+                let resp = egui::ComboBox::from_id_source("presets-combo")
+                    .width(300.0)
+                    .show_index(ui, selected_preset, PRESETS.len() + 1, |i| {
                         PRESETS
                             .get(i)
                             .map(|p| p.name.to_string())
                             .unwrap_or_else(|| "Custom".to_string())
-                    },
-                );
+                    });
                 if resp.changed() {
                     println!("changed to {}", selected_preset);
                     if let Some(preset) = PRESETS.get(*selected_preset) {

@@ -21,7 +21,7 @@ impl Default for Simulation {
 impl Simulation {
     pub(in crate::app) fn show(&mut self, ui: &mut Ui, most_likely: Option<Vec<SimResult>>) -> u32 {
         ui.vertical(|ui| {
-            ui.label("Most Likely Outcomes");
+            ui.heading("Most Likely Outcomes");
             ui.horizontal(|ui| {
                 ui.label("Simulation runs");
                 egui::ComboBox::from_id_source("simulation-runs").show_index(
