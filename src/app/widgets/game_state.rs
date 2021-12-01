@@ -1,7 +1,7 @@
 use arrayvec::ArrayVec;
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, epaint, Ui, Vec2};
 
-use crate::app::chance::Chance;
+use crate::app::{chance::Chance, solution::Answer};
 
 type Row = ArrayVec<bool, { ALL_NUM_SLOTS[ALL_NUM_SLOTS.len() - 1].0 as usize }>;
 
@@ -67,10 +67,37 @@ const ALL_NUM_SLOTS: [(u8, &str); 15] = [
 
 const ROW_LABELS: [&str; 3] = ["Skill 1", "Skill 2", "Negative"];
 
+const TRANSPARENT_FRAME: egui::Frame = egui::Frame {
+    margin: Vec2::new(2.0, 2.0),
+    corner_radius: 0.0,
+    shadow: epaint::Shadow {
+        extrusion: 0.0,
+        color: egui::Color32::TRANSPARENT,
+    },
+    fill: egui::Color32::TRANSPARENT,
+    stroke: egui::Stroke {
+        width: 2.0,
+        color: egui::Color32::TRANSPARENT,
+    },
+};
+
+const HIGHLIGHT_FRAME: egui::Frame = egui::Frame {
+    margin: Vec2::new(2.0, 2.0),
+    corner_radius: 0.0,
+    shadow: epaint::Shadow {
+        extrusion: 0.0,
+        color: egui::Color32::TRANSPARENT,
+    },
+    fill: egui::Color32::TRANSPARENT,
+    stroke: egui::Stroke {
+        width: 2.0,
+        color: egui::Color32::GREEN,
+    },
+};
+
 impl GameState {
-    pub(in crate::app) fn show(&mut self, ui: &mut Ui) {
+    pub(in crate::app) fn show(&mut self, ui: &mut Ui, optimal: Option<Answer>) {
         ui.vertical(|ui| {
-            ui.label("Current State");
             ui.horizontal(|ui| {
                 ui.label("Success Chance:");
                 egui::ComboBox::from_id_source("success-chance-combo")
@@ -90,6 +117,13 @@ impl GameState {
                             ui.selectable_value(&mut self.num_slots, n, text);
                         }
                     });
+
+                if ui.button("RESET").clicked() {
+                    self.chance = Chance::SeventyFive;
+                    for r in &mut self.rows {
+                        r.clear();
+                    }
+                }
             });
 
             let num_slots = usize::from(self.num_slots);
@@ -98,10 +132,17 @@ impl GameState {
             }
 
             egui::Grid::new("main-state-grid").show(ui, |ui| {
-                for (&label, row) in ROW_LABELS.iter().zip(&mut self.rows) {
-                    show_slots_row(ui, label, num_slots, row, &mut self.chance)
+                for (i, (&label, row)) in ROW_LABELS.iter().zip(&mut self.rows).enumerate() {
+                    show_slots_row(ui, label, num_slots, row, &mut self.chance, i, optimal)
                 }
             });
+            if let Some(answer) = optimal {
+                ui.separator();
+                ui.label(format!(
+                    "*** BEST CHOICE: {} (score contribution = {:.3}) ***",
+                    ROW_LABELS[answer.index], answer.score
+                ));
+            }
         });
     }
 }
@@ -112,8 +153,18 @@ fn show_slots_row(
     num_slots: usize,
     row: &mut Row,
     chance: &mut Chance,
+    row_index: usize,
+    optimal: Option<Answer>,
 ) {
-    ui.label(label);
+    let label_frame = if optimal.map(|a| a.index) == Some(row_index) {
+        &HIGHLIGHT_FRAME
+    } else {
+        &TRANSPARENT_FRAME
+    };
+    label_frame.show(ui, |ui| {
+        ui.label(label);
+    });
+
     for i in 0..num_slots {
         if let Some(&succeeded) = row.get(i) {
             ui.label(if succeeded { "+1" } else { "fail" });

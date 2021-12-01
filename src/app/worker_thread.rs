@@ -1,5 +1,5 @@
 use super::{
-    solution::{Scoring, Solution},
+    solution::{Answer, Scoring, Solution},
     widgets::GameState,
 };
 use crossbeam_channel::{Receiver, Sender};
@@ -84,6 +84,14 @@ impl ThreadHandle {
 
     pub(super) fn sim_results(&self) -> Option<Vec<SimResult>> {
         self.state.read().most_likely.clone()
+    }
+
+    pub(super) fn optimal_choice(&self, state: &GameState) -> Option<Answer> {
+        self.state
+            .read()
+            .solution
+            .as_ref()
+            .and_then(|solution| solution.optimal_choice(state))
     }
 }
 

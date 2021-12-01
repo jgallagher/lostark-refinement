@@ -135,32 +135,12 @@ impl epi::App for TemplateApp {
 
                 ui.group(|ui| {
                     let prev_state = game_state.clone();
-                    game_state.show(ui);
+                    game_state.show(ui, worker_thread.optimal_choice(&prev_state));
                     if prev_state != *game_state {
                         worker_thread.update_game_state(game_state.clone());
                     }
                 });
             });
-
-            /*
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
-            ));
-            egui::warn_if_debug_build(ui);
-            if ui
-                .add_enabled(
-                    worker_thread_state.is_some(),
-                    egui::Button::new("Update state!"),
-                )
-                .clicked()
-            {
-                println!("requesting state update");
-                worker_thread.request_update_state();
-            }
-            */
         });
 
         egui::TopBottomPanel::bottom("bottom-panel").show(ctx, |ui| {

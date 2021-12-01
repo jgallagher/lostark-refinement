@@ -16,6 +16,20 @@ struct State {
     pub(super) remaining: [u8; 3],
 }
 
+impl From<&GameState> for State {
+    fn from(gs: &GameState) -> Self {
+        let num_slots = gs.num_slots();
+        Self {
+            chance: gs.chance(),
+            remaining: [
+                num_slots - gs.row(0).len() as u8,
+                num_slots - gs.row(1).len() as u8,
+                num_slots - gs.row(2).len() as u8,
+            ],
+        }
+    }
+}
+
 impl State {
     fn available_choices(&self) -> ArrayVec<usize, 3> {
         let mut out = ArrayVec::new();
@@ -110,11 +124,11 @@ impl Solution {
 
                 for index in available_choices {
                     let (success_state, fail_state) = state.transition(index);
-                    let success_answer = self.lookup(&success_state);
-                    let fail_answer = self.lookup(&fail_state);
+                    let success_score = self.lookup(&success_state).map(|a| a.score).unwrap_or(0.0);
+                    let fail_score = self.lookup(&fail_state).map(|a| a.score).unwrap_or(0.0);
 
-                    let score = prob_success * (self.scoring.success[index] + success_answer.score)
-                        + prob_fail * (self.scoring.fail[index] + fail_answer.score);
+                    let score = prob_success * (self.scoring.success[index] + success_score)
+                        + prob_fail * (self.scoring.fail[index] + fail_score);
 
                     scores.push(Answer { index, score });
                 }
@@ -144,40 +158,36 @@ impl Solution {
         }
     }
 
-    fn lookup(&self, state: &State) -> Answer {
+    fn lookup(&self, state: &State) -> Option<Answer> {
         if let Some(answer) = self.optimal.get(&state) {
-            return *answer;
+            return Some(*answer);
         }
         assert!(
             state.available_choices().is_empty(),
             "bad lookup: {:?}",
             state
         );
-        Answer {
-            index: usize::MAX,
-            score: 0.0,
-        }
+        None
+    }
+
+    pub(super) fn optimal_choice(&self, state: &GameState) -> Option<Answer> {
+        let state = State::from(state);
+        self.lookup(&state)
     }
 
     pub(super) fn simulate_once(&self, start: &GameState, rng: &mut ThreadRng) -> [u8; 3] {
-        let num_slots = start.num_slots();
-        assert_eq!(self.count, num_slots);
-
-        let mut remaining = [num_slots, num_slots, num_slots];
-        let mut scores = [0, 0, 0];
-        for i in 0..3 {
-            let row = start.row(i);
-            remaining[i] -= row.len() as u8;
-            scores[i] = row.iter().filter(|&&x| x).count() as u8;
-        }
-
-        let mut state = State {
-            chance: start.chance(),
-            remaining,
-        };
+        assert_eq!(self.count, start.num_slots());
+        let mut state = State::from(start);
+        let mut scores = [
+            start.row(0).iter().filter(|&&x| x).count() as u8,
+            start.row(1).iter().filter(|&&x| x).count() as u8,
+            start.row(2).iter().filter(|&&x| x).count() as u8,
+        ];
 
         while !state.available_choices().is_empty() {
-            let best = self.lookup(&state);
+            // lookup is guaranteed to succeed as long as we have at least one
+            // available choice
+            let best = self.lookup(&state).unwrap();
             let success = state.update(best.index, rng);
             if success {
                 scores[best.index] += 1;
