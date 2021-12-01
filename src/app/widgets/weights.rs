@@ -61,10 +61,12 @@ pub(in crate::app) struct Weights {
 
 impl Default for Weights {
     fn default() -> Self {
-        Self {
-            success: ["1.0".to_string(), "1.5".to_string(), "-1.0".to_string()],
-            fail: ["-1.0".to_string(), "-1.0".to_string(), "0.0".to_string()],
-        }
+        let mut this = Self {
+            success: Default::default(),
+            fail: Default::default(),
+        };
+        this.assign_to_preset(&PRESETS[0]);
+        this
     }
 }
 

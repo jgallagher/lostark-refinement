@@ -92,7 +92,7 @@ impl epi::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
         let Self {
             weights,
             selected_preset,
@@ -110,12 +110,13 @@ impl epi::App for TemplateApp {
         // Tip: a good default choice is to just keep the `CentralPanel`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
+        #[cfg(not(target_arch = "wasm32"))]
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 egui::menu::menu(ui, "File", |ui| {
                     if ui.button("Quit").clicked() {
-                        frame.quit();
+                        _frame.quit();
                     }
                 });
             });
@@ -135,31 +136,46 @@ impl epi::App for TemplateApp {
 
                 //ui.horizontal(|ui| {
                 //ui.with_layout(egui::Layout::top_down_justified(egui::Align::Center), |ui| {
-                ui.with_layout(egui::Layout::left_to_right().with_main_justify(true).with_cross_align(egui::Align::Min), |ui| {
-                    ui.group(|ui| {
-                        let scoring = weights.show(ui, selected_preset);
-                        if let Some(scoring) = scoring {
-                            // Update our & worker thread's scoring
-                            if Some(scoring) != *current_scoring {
-                                *current_scoring = Some(scoring);
-                                worker_thread.update_weights(scoring);
+                ui.with_layout(
+                    egui::Layout::left_to_right()
+                        .with_main_justify(true)
+                        .with_cross_align(egui::Align::Min),
+                    |ui| {
+                        ui.group(|ui| {
+                            let scoring = weights.show(ui, selected_preset);
+                            if let Some(scoring) = scoring {
+                                // Update our & worker thread's scoring
+                                if Some(scoring) != *current_scoring {
+                                    *current_scoring = Some(scoring);
+                                    worker_thread.update_weights(scoring);
+                                }
                             }
-                        }
-                    });
+                        });
 
-                    ui.group(|ui| {
-                        let tries = simulation.show(ui, worker_thread.sim_results());
-                        if Some(tries) != *sim_tries {
-                            *sim_tries = Some(tries);
-                            worker_thread.update_sim_tries(tries);
-                        }
-                    });
-                });
+                        ui.group(|ui| {
+                            let tries = simulation.show(ui, worker_thread.sim_results());
+                            if Some(tries) != *sim_tries {
+                                *sim_tries = Some(tries);
+                                worker_thread.update_sim_tries(tries);
+                            }
+                        });
+                    },
+                );
             });
         });
 
         egui::TopBottomPanel::bottom("bottom-panel").show(ctx, |ui| {
             ui.label(worker_thread.status());
+
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
+                ui.horizontal(|ui| {
+                    //ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/eframe");
+                    ui.label("and");
+                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
+                    ui.label("powered by");
+                })
+            });
         });
 
         if false {

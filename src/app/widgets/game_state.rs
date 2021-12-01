@@ -132,11 +132,13 @@ impl GameState {
                 row.truncate(num_slots);
             }
 
-            egui::Grid::new("main-state-grid").show(ui, |ui| {
-                for (i, (&label, row)) in ROW_LABELS.iter().zip(&mut self.rows).enumerate() {
-                    show_slots_row(ui, label, num_slots, row, &mut self.chance, i, &choices)
-                }
-            });
+            egui::Grid::new("main-state-grid")
+                .min_row_height(45.0)
+                .show(ui, |ui| {
+                    for (i, (&label, row)) in ROW_LABELS.iter().zip(&mut self.rows).enumerate() {
+                        show_slots_row(ui, label, num_slots, row, &mut self.chance, i, &choices)
+                    }
+                });
 
             if let Some(mut choices) = choices {
                 ui.separator();
