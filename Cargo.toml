@@ -14,6 +14,8 @@ arrayvec = "0.7"
 crossbeam-channel = "0.5"
 eframe = "0.15.0" # Gives us egui, epi and web+native backends
 fnv = "1.0"
+getrandom = { version = "0.2", features = ["js"] }
+instant = { version = "0.1.12", features = ["wasm-bindgen", "inaccurate"] }
 parking_lot = "0.11"
 rand = "0.8"
 
