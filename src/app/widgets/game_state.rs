@@ -20,6 +20,12 @@ impl Default for GameState {
     }
 }
 
+impl GameState {
+    pub(in crate::app) fn num_slots(&self) -> u8 {
+        self.num_slots
+    }
+}
+
 const ALL_CHANCES: [Chance; 6] = [
     Chance::SeventyFive,
     Chance::SixtyFive,

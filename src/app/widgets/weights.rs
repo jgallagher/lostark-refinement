@@ -193,4 +193,19 @@ impl Weights {
             self.fail[i] = format!("{:.1}", preset.scoring.fail[i]);
         }
     }
+
+    pub(in crate::app) fn parse(&self) -> Option<Scoring> {
+        parsed_fields_to_scoring(
+            [
+                self.success[0].parse().ok(),
+                self.success[1].parse().ok(),
+                self.success[2].parse().ok(),
+            ],
+            [
+                self.fail[0].parse().ok(),
+                self.fail[1].parse().ok(),
+                self.fail[2].parse().ok(),
+            ],
+        )
+    }
 }

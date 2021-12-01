@@ -16,19 +16,29 @@ pub(super) struct ThreadHandle {
     state: Arc<RwLock<State>>,
     update_weights: Sender<Scoring>,
     update_sim_tries: Sender<u32>,
+    update_num_slots: Sender<u8>,
 }
 
 impl ThreadHandle {
-    pub(super) fn spawn(repaint_signal: Arc<dyn RepaintSignal>) -> Self {
+    pub(super) fn spawn(
+        scoring: Option<Scoring>,
+        num_slots: u8,
+        sim_tries: Option<u32>,
+        repaint_signal: Arc<dyn RepaintSignal>,
+    ) -> Self {
         let state = Arc::default();
         let (update_weights, update_weights_rx) = crossbeam_channel::unbounded();
         let (update_sim_tries, update_sim_tries_rx) = crossbeam_channel::unbounded();
+        let (update_num_slots, update_num_slots_rx) = crossbeam_channel::unbounded();
 
         let inner = Inner {
             state: Arc::clone(&state),
             update_weights: update_weights_rx,
             update_sim_tries: update_sim_tries_rx,
-            sim_tries: None,
+            update_num_slots: update_num_slots_rx,
+            scoring,
+            sim_tries,
+            num_slots,
             repaint_signal,
         };
         thread::spawn(move || inner.run());
@@ -36,6 +46,7 @@ impl ThreadHandle {
             state,
             update_weights,
             update_sim_tries,
+            update_num_slots,
         }
     }
 
@@ -64,6 +75,10 @@ impl ThreadHandle {
         self.update_sim_tries.send(sim_tries).unwrap();
     }
 
+    pub(super) fn update_num_slots(&self, num_slots: u8) {
+        self.update_num_slots.send(num_slots).unwrap();
+    }
+
     pub(super) fn sim_results(&self) -> Option<Vec<SimResult>> {
         self.state.read().most_likely.clone()
     }
@@ -90,40 +105,62 @@ struct Inner {
     state: Arc<RwLock<State>>,
     update_weights: Receiver<Scoring>,
     update_sim_tries: Receiver<u32>,
+    update_num_slots: Receiver<u8>,
+    scoring: Option<Scoring>,
     sim_tries: Option<u32>,
+    num_slots: u8,
     repaint_signal: Arc<dyn RepaintSignal>,
+}
+
+fn drain_pending<T>(rx: &Receiver<T>, mut val: T) -> T {
+    while let Ok(v) = rx.try_recv() {
+        val = v;
+    }
+    val
 }
 
 impl Inner {
     fn run(mut self) -> Result<(), crossbeam_channel::TryRecvError> {
+        self.rebuild_solution();
         loop {
             crossbeam_channel::select! {
                 recv(self.update_weights) -> scoring => {
-                    self.rebuild_solution(scoring?);
+                    let scoring = drain_pending(&self.update_weights, scoring?);
+                    self.scoring = Some(scoring);
+                    self.rebuild_solution();
                 }
                 recv(self.update_sim_tries) -> sim_tries => {
-                    self.sim_tries = Some(sim_tries?);
-                    println!("background thread received sim_tries {}", sim_tries.unwrap());
-                    self.state.write().reset_simulation();
-                    self.repaint_signal.request_repaint();
-                    self.rerun_simulation();
+                    let sim_tries = drain_pending(&self.update_sim_tries, sim_tries?);
+                    self.sim_tries = Some(sim_tries);
+                    self.reset_and_rerun_simulation();
+                }
+                recv(self.update_num_slots) -> num_slots => {
+                    let num_slots = drain_pending(&self.update_num_slots, num_slots?);
+                    self.num_slots = num_slots;
+                    self.rebuild_solution();
                 }
             }
         }
     }
 
-    fn rebuild_solution(&self, mut scoring: Scoring) {
-        // drain any queued up changes, only keeping the latest
-        while let Ok(s) = self.update_weights.try_recv() {
-            scoring = s;
-        }
+    fn rebuild_solution(&self) {
+        let scoring = match self.scoring {
+            Some(scoring) => scoring,
+            None => return,
+        };
         println!("background thread received new scoring {:?}", scoring);
         self.state.write().reset_solution();
 
-        let new_solution = Solution::build(scoring, 24); // TODO count from UI
+        let new_solution = Solution::build(scoring, self.num_slots);
 
         self.state.write().solution = Some(new_solution);
 
+        self.repaint_signal.request_repaint();
+        self.rerun_simulation();
+    }
+
+    fn reset_and_rerun_simulation(&self) {
+        self.state.write().reset_simulation();
         self.repaint_signal.request_repaint();
         self.rerun_simulation();
     }
