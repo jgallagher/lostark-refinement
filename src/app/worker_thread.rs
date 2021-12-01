@@ -1,6 +1,7 @@
 use super::{
     solution::{Answer, Scoring, Solution},
     widgets::GameState,
+    SimResult,
 };
 use arrayvec::ArrayVec;
 use crossbeam_channel::{Receiver, Sender};
@@ -8,13 +9,6 @@ use eframe::epi::RepaintSignal;
 use fnv::FnvHashMap;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{sync::Arc, thread};
-
-#[derive(Debug, Clone, Copy)]
-pub(super) struct SimResult {
-    pub(super) counts: [u8; 3],
-    pub(super) probability: f64,
-    pub(super) score: f64,
-}
 
 pub(super) struct ThreadHandle {
     state: Arc<RwLock<State>>,
@@ -196,25 +190,7 @@ impl Inner {
             None => return,
         };
 
-        let mut counts: FnvHashMap<[u8; 3], u32> = FnvHashMap::default();
-        let mut rng = rand::thread_rng();
-        for _ in 0..sim_tries {
-            *counts
-                .entry(solution.simulate_once(&self.game_state, &mut rng))
-                .or_default() += 1;
-        }
-        let mut counts = counts.into_iter().collect::<Vec<_>>();
-        counts.sort_unstable_by_key(|(_result, count)| *count);
-
-        let mut most_likely = Vec::with_capacity(SIM_RESULTS_TO_DISPLAY);
-        for (result, count) in counts.into_iter().rev().take(SIM_RESULTS_TO_DISPLAY) {
-            let score = solution.eval_result(result);
-            most_likely.push(SimResult {
-                counts: result,
-                probability: f64::from(count) / f64::from(sim_tries),
-                score,
-            });
-        }
+        let most_likely = solution.simulate_top_10(sim_tries, &self.game_state);
 
         {
             let mut state = RwLockUpgradableReadGuard::upgrade(state);

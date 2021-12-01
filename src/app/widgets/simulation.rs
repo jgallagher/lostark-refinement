@@ -1,6 +1,5 @@
+use crate::app::SimResult;
 use eframe::egui::{self, Ui};
-
-use crate::app::worker_thread::SimResult;
 
 const PRESET_TRIES: [u32; 4] = [100, 1_000, 10_000, 100_000];
 

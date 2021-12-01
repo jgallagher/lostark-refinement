@@ -3,11 +3,24 @@ use eframe::{egui, epi};
 mod chance;
 mod solution;
 mod widgets;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod worker_thread;
+
+#[cfg(target_arch = "wasm32")]
+#[path = "app/wasm_worker.rs"]
 mod worker_thread;
 
 use self::solution::Scoring;
 use self::widgets::{GameState, Simulation, Weights};
 use self::worker_thread::ThreadHandle;
+
+#[derive(Debug, Clone, Copy)]
+struct SimResult {
+    counts: [u8; 3],
+    probability: f64,
+    score: f64,
+}
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

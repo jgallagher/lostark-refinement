@@ -2,7 +2,7 @@ use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use rand::prelude::*;
 
-use super::{chance::Chance, widgets::GameState};
+use super::{chance::Chance, widgets::GameState, SimResult};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Answer {
@@ -217,6 +217,30 @@ impl Solution {
         }
 
         scores
+    }
+
+    pub(super) fn simulate_top_10(&self, sim_tries: u32, start: &GameState) -> Vec<SimResult> {
+        let mut counts: FnvHashMap<[u8; 3], u32> = FnvHashMap::default();
+        let mut rng = rand::thread_rng();
+        for _ in 0..sim_tries {
+            *counts
+                .entry(self.simulate_once(start, &mut rng))
+                .or_default() += 1;
+        }
+        let mut counts = counts.into_iter().collect::<Vec<_>>();
+        counts.sort_unstable_by_key(|(_result, count)| *count);
+
+        let mut most_likely = Vec::with_capacity(10);
+        for (result, count) in counts.into_iter().rev().take(10) {
+            let score = self.eval_result(result);
+            most_likely.push(SimResult {
+                counts: result,
+                probability: f64::from(count) / f64::from(sim_tries),
+                score,
+            });
+        }
+
+        most_likely
     }
 
     pub(super) fn eval_result(&self, result: [u8; 3]) -> f64 {
