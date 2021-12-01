@@ -36,7 +36,7 @@ impl Simulation {
                     egui::Grid::new("sim-results-grid").show(ui, |ui| {
                         ui.label("Skill 1");
                         ui.label("Skill 2");
-                        ui.label("Debuff");
+                        ui.label("Negative");
                         ui.label("Probability");
                         ui.label("Final Score");
                         ui.end_row();

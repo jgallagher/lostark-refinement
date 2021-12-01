@@ -37,14 +37,14 @@ const PRESETS: [Preset; 6] = [
         },
     },
     Preset {
-        name: "Minimize debuff; slightly prefer skill 1",
+        name: "Minimize negative; slightly prefer skill 1",
         scoring: Scoring {
             success: [1.1, 1.0, -100.0],
             fail: [0.0, 0.0, 100.0],
         },
     },
     Preset {
-        name: "Minimize debuff; slightly prefer skill 2",
+        name: "Minimize negative; slightly prefer skill 2",
         scoring: Scoring {
             success: [1.0, 1.1, -100.0],
             fail: [0.0, 0.0, 100.0],
@@ -141,7 +141,7 @@ impl Weights {
                     ui.label("Fail");
                     ui.end_row();
 
-                    for (i, &s) in ["Buff 1", "Buff 2", "Debuff"].iter().enumerate() {
+                    for (i, &s) in ["Skill 1", "Skill 2", "Negative"].iter().enumerate() {
                         ui.label(s);
                         success[i] = show_textedit(ui, &mut self.success[i]);
                         fail[i] = show_textedit(ui, &mut self.fail[i]);
