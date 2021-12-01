@@ -1,13 +1,17 @@
+use arrayvec::ArrayVec;
 use eframe::egui::{self, Ui};
 
 use crate::app::chance::Chance;
 
+type Row = ArrayVec<bool, { ALL_NUM_SLOTS[ALL_NUM_SLOTS.len() - 1].0 as usize }>;
+
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::app) struct GameState {
     chance: Chance,
     num_slots: u8,
-    rows: [Vec<bool>; 3],
+    rows: [Row; 3],
 }
 
 impl Default for GameState {
@@ -15,14 +19,22 @@ impl Default for GameState {
         Self {
             chance: Chance::SeventyFive,
             num_slots: 8,
-            rows: [Vec::new(), Vec::new(), Vec::new()],
+            rows: [Row::new(), Row::new(), Row::new()],
         }
     }
 }
 
 impl GameState {
+    pub(in crate::app) fn chance(&self) -> Chance {
+        self.chance
+    }
+
     pub(in crate::app) fn num_slots(&self) -> u8 {
         self.num_slots
+    }
+
+    pub(in crate::app) fn row(&self, i: usize) -> &[bool] {
+        &self.rows[i]
     }
 }
 
@@ -98,7 +110,7 @@ fn show_slots_row(
     ui: &mut Ui,
     label: &'static str,
     num_slots: usize,
-    row: &mut Vec<bool>,
+    row: &mut Row,
     chance: &mut Chance,
 ) {
     ui.label(label);

@@ -1,4 +1,7 @@
-use super::solution::{Scoring, Solution};
+use super::{
+    solution::{Scoring, Solution},
+    widgets::GameState,
+};
 use crossbeam_channel::{Receiver, Sender};
 use eframe::epi::RepaintSignal;
 use fnv::FnvHashMap;
@@ -16,29 +19,29 @@ pub(super) struct ThreadHandle {
     state: Arc<RwLock<State>>,
     update_weights: Sender<Scoring>,
     update_sim_tries: Sender<u32>,
-    update_num_slots: Sender<u8>,
+    update_game_state: Sender<GameState>,
 }
 
 impl ThreadHandle {
     pub(super) fn spawn(
         scoring: Option<Scoring>,
-        num_slots: u8,
+        game_state: GameState,
         sim_tries: Option<u32>,
         repaint_signal: Arc<dyn RepaintSignal>,
     ) -> Self {
         let state = Arc::default();
         let (update_weights, update_weights_rx) = crossbeam_channel::unbounded();
         let (update_sim_tries, update_sim_tries_rx) = crossbeam_channel::unbounded();
-        let (update_num_slots, update_num_slots_rx) = crossbeam_channel::unbounded();
+        let (update_game_state, update_game_state_rx) = crossbeam_channel::unbounded();
 
         let inner = Inner {
             state: Arc::clone(&state),
             update_weights: update_weights_rx,
             update_sim_tries: update_sim_tries_rx,
-            update_num_slots: update_num_slots_rx,
+            update_game_state: update_game_state_rx,
             scoring,
             sim_tries,
-            num_slots,
+            game_state,
             repaint_signal,
         };
         thread::spawn(move || inner.run());
@@ -46,7 +49,7 @@ impl ThreadHandle {
             state,
             update_weights,
             update_sim_tries,
-            update_num_slots,
+            update_game_state,
         }
     }
 
@@ -75,8 +78,8 @@ impl ThreadHandle {
         self.update_sim_tries.send(sim_tries).unwrap();
     }
 
-    pub(super) fn update_num_slots(&self, num_slots: u8) {
-        self.update_num_slots.send(num_slots).unwrap();
+    pub(super) fn update_game_state(&self, game_state: GameState) {
+        self.update_game_state.send(game_state).unwrap();
     }
 
     pub(super) fn sim_results(&self) -> Option<Vec<SimResult>> {
@@ -105,10 +108,10 @@ struct Inner {
     state: Arc<RwLock<State>>,
     update_weights: Receiver<Scoring>,
     update_sim_tries: Receiver<u32>,
-    update_num_slots: Receiver<u8>,
+    update_game_state: Receiver<GameState>,
     scoring: Option<Scoring>,
     sim_tries: Option<u32>,
-    num_slots: u8,
+    game_state: GameState,
     repaint_signal: Arc<dyn RepaintSignal>,
 }
 
@@ -134,10 +137,15 @@ impl Inner {
                     self.sim_tries = Some(sim_tries);
                     self.reset_and_rerun_simulation();
                 }
-                recv(self.update_num_slots) -> num_slots => {
-                    let num_slots = drain_pending(&self.update_num_slots, num_slots?);
-                    self.num_slots = num_slots;
-                    self.rebuild_solution();
+                recv(self.update_game_state) -> game_state => {
+                    let game_state = drain_pending(&self.update_game_state, game_state?);
+                    let prev_num_slots = self.game_state.num_slots();
+                    self.game_state = game_state;
+                    if self.game_state.num_slots() != prev_num_slots {
+                        self.rebuild_solution();
+                    } else {
+                        self.reset_and_rerun_simulation();
+                    }
                 }
             }
         }
@@ -151,7 +159,7 @@ impl Inner {
         println!("background thread received new scoring {:?}", scoring);
         self.state.write().reset_solution();
 
-        let new_solution = Solution::build(scoring, self.num_slots);
+        let new_solution = Solution::build(scoring, self.game_state.num_slots());
 
         self.state.write().solution = Some(new_solution);
 
@@ -182,7 +190,9 @@ impl Inner {
         let mut counts: FnvHashMap<[u8; 3], u32> = FnvHashMap::default();
         let mut rng = rand::thread_rng();
         for _ in 0..sim_tries {
-            *counts.entry(solution.simulate_once(&mut rng)).or_default() += 1;
+            *counts
+                .entry(solution.simulate_once(&self.game_state, &mut rng))
+                .or_default() += 1;
         }
         let mut counts = counts.into_iter().collect::<Vec<_>>();
         counts.sort_unstable_by_key(|(_result, count)| *count);

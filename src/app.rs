@@ -63,7 +63,7 @@ impl epi::App for TemplateApp {
         // spawn worker thread
         let worker_thread = ThreadHandle::spawn(
             self.weights.parse(),
-            self.game_state.num_slots(),
+            self.game_state.clone(),
             self.sim_tries,
             frame.repaint_signal(),
         );
@@ -134,11 +134,10 @@ impl epi::App for TemplateApp {
                 });
 
                 ui.group(|ui| {
-                    let prev_num_slots = game_state.num_slots();
+                    let prev_state = game_state.clone();
                     game_state.show(ui);
-                    let num_slots = game_state.num_slots();
-                    if prev_num_slots != num_slots {
-                        worker_thread.update_num_slots(num_slots);
+                    if prev_state != *game_state {
+                        worker_thread.update_game_state(game_state.clone());
                     }
                 });
             });

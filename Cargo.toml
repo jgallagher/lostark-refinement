@@ -21,7 +21,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
 default = []
-persistence = ["eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
+persistence = ["arrayvec/serde", "eframe/persistence", "serde"] # Enable if you want to persist app state on shutdown
 
 [profile.release]
 opt-level = 2 # fast and small wasm

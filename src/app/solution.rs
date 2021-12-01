@@ -2,7 +2,7 @@ use arrayvec::ArrayVec;
 use fnv::FnvHashMap;
 use rand::prelude::*;
 
-use super::chance::Chance;
+use super::{chance::Chance, widgets::GameState};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Answer {
@@ -17,13 +17,6 @@ struct State {
 }
 
 impl State {
-    fn new(count: u8) -> Self {
-        Self {
-            chance: Chance::SeventyFive,
-            remaining: [count; 3],
-        }
-    }
-
     fn available_choices(&self) -> ArrayVec<usize, 3> {
         let mut out = ArrayVec::new();
         for i in 0..3 {
@@ -166,9 +159,22 @@ impl Solution {
         }
     }
 
-    pub(super) fn simulate_once(&self, rng: &mut ThreadRng) -> [u8; 3] {
-        let mut state = State::new(self.count);
-        let mut scores = [0; 3];
+    pub(super) fn simulate_once(&self, start: &GameState, rng: &mut ThreadRng) -> [u8; 3] {
+        let num_slots = start.num_slots();
+        assert_eq!(self.count, num_slots);
+
+        let mut remaining = [num_slots, num_slots, num_slots];
+        let mut scores = [0, 0, 0];
+        for i in 0..3 {
+            let row = start.row(i);
+            remaining[i] -= row.len() as u8;
+            scores[i] = row.iter().filter(|&&x| x).count() as u8;
+        }
+
+        let mut state = State {
+            chance: start.chance(),
+            remaining,
+        };
 
         while !state.available_choices().is_empty() {
             let best = self.lookup(&state);
@@ -194,21 +200,3 @@ const ALL_CHANCES: [Chance; 6] = [
     Chance::SixtyFive,
     Chance::SeventyFive,
 ];
-
-/*
-pub(crate) fn play(solution: &Solution, rng: &mut ThreadRng) -> [u8; 3] {
-    let mut state = State::new(solution.count);
-    let mut scores = [0; 3];
-
-    while !state.available_choices().is_empty() {
-        let best = solution.lookup(&state);
-        println!("{:.2} {:?} -> {} ({})", state.chance.as_f64(), state.remaining, best.index, best.score);
-        let success = state.update(best.index, rng);
-        if success {
-            scores[best.index] += 1;
-        }
-    }
-
-    scores
-}
-*/
