@@ -6,7 +6,6 @@ use super::{
 use arrayvec::ArrayVec;
 use crossbeam_channel::{Receiver, Sender};
 use eframe::epi::RepaintSignal;
-use fnv::FnvHashMap;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{sync::Arc, thread};
 
@@ -159,7 +158,6 @@ impl Inner {
             Some(scoring) => scoring,
             None => return,
         };
-        println!("background thread received new scoring {:?}", scoring);
         self.state.write().reset_solution();
 
         let new_solution = Solution::build(scoring, self.game_state.num_slots());
@@ -177,8 +175,6 @@ impl Inner {
     }
 
     fn rerun_simulation(&self) {
-        const SIM_RESULTS_TO_DISPLAY: usize = 10;
-
         let sim_tries = match self.sim_tries {
             Some(n) => n,
             None => return,

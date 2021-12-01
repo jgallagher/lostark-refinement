@@ -1,5 +1,6 @@
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::enum_variant_names)]
 pub(super) enum Chance {
     TwentyFive,
     ThirtyFive,

@@ -176,7 +176,7 @@ impl Solution {
     }
 
     fn lookup(&self, state: &State) -> Option<ArrayVec<Answer, 3>> {
-        if let Some(answer) = self.optimal.get(&state) {
+        if let Some(answer) = self.optimal.get(state) {
             return Some(answer.clone());
         }
         assert!(
