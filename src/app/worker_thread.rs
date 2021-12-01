@@ -2,6 +2,7 @@ use super::{
     solution::{Answer, Scoring, Solution},
     widgets::GameState,
 };
+use arrayvec::ArrayVec;
 use crossbeam_channel::{Receiver, Sender};
 use eframe::epi::RepaintSignal;
 use fnv::FnvHashMap;
@@ -86,12 +87,12 @@ impl ThreadHandle {
         self.state.read().most_likely.clone()
     }
 
-    pub(super) fn optimal_choice(&self, state: &GameState) -> Option<Answer> {
+    pub(super) fn sorted_choices(&self, state: &GameState) -> Option<ArrayVec<Answer, 3>> {
         self.state
             .read()
             .solution
             .as_ref()
-            .and_then(|solution| solution.optimal_choice(state))
+            .and_then(|solution| solution.sorted_choices(state))
     }
 }
 

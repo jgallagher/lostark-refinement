@@ -96,7 +96,7 @@ const HIGHLIGHT_FRAME: egui::Frame = egui::Frame {
 };
 
 impl GameState {
-    pub(in crate::app) fn show(&mut self, ui: &mut Ui, optimal: Option<Answer>) {
+    pub(in crate::app) fn show(&mut self, ui: &mut Ui, choices: Option<ArrayVec<Answer, 3>>) {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Success Chance:");
@@ -133,15 +133,26 @@ impl GameState {
 
             egui::Grid::new("main-state-grid").show(ui, |ui| {
                 for (i, (&label, row)) in ROW_LABELS.iter().zip(&mut self.rows).enumerate() {
-                    show_slots_row(ui, label, num_slots, row, &mut self.chance, i, optimal)
+                    show_slots_row(ui, label, num_slots, row, &mut self.chance, i, &choices)
                 }
             });
-            if let Some(answer) = optimal {
+
+            if let Some(mut choices) = choices {
                 ui.separator();
-                ui.label(format!(
-                    "*** BEST CHOICE: {} (score contribution = {:.3}) ***",
-                    ROW_LABELS[answer.index], answer.score
-                ));
+                ui.label("Average Final Score for Each Choice");
+                let best = choices[0].index;
+                choices.sort_unstable_by_key(|a| a.index);
+
+                egui::Grid::new("each-choice-final-score-grid").show(ui, |ui| {
+                    for choice in choices {
+                        ui.label(ROW_LABELS[choice.index]);
+                        ui.label(format!("{:.3}", choice.score));
+                        if choice.index == best {
+                            ui.label("*** BEST ***");
+                        }
+                        ui.end_row();
+                    }
+                });
             }
         });
     }
@@ -154,9 +165,9 @@ fn show_slots_row(
     row: &mut Row,
     chance: &mut Chance,
     row_index: usize,
-    optimal: Option<Answer>,
+    optimal: &Option<ArrayVec<Answer, 3>>,
 ) {
-    let label_frame = if optimal.map(|a| a.index) == Some(row_index) {
+    let label_frame = if optimal.as_ref().map(|a| a[0].index) == Some(row_index) {
         &HIGHLIGHT_FRAME
     } else {
         &TRANSPARENT_FRAME

@@ -135,7 +135,7 @@ impl epi::App for TemplateApp {
 
                 ui.group(|ui| {
                     let prev_state = game_state.clone();
-                    game_state.show(ui, worker_thread.optimal_choice(&prev_state));
+                    game_state.show(ui, worker_thread.sorted_choices(&prev_state));
                     if prev_state != *game_state {
                         worker_thread.update_game_state(game_state.clone());
                     }

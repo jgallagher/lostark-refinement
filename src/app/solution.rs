@@ -73,7 +73,7 @@ pub(super) struct Scoring {
 }
 
 impl Scoring {
-    pub(super) fn eval(&self, scores: [u8; 3], count: u8) -> f64 {
+    fn eval(&self, scores: [u8; 3], count: u8) -> f64 {
         self.success[0] * f64::from(scores[0])
             + self.success[1] * f64::from(scores[1])
             + self.success[2] * f64::from(scores[2])
@@ -81,12 +81,26 @@ impl Scoring {
             + self.fail[1] * (f64::from(count) - f64::from(scores[1]))
             + self.fail[2] * (f64::from(count) - f64::from(scores[2]))
     }
+
+    fn eval_partial(&self, state: &GameState) -> f64 {
+        let mut score = 0.0;
+        for i in 0..3 {
+            for &succeeded in state.row(i) {
+                score += if succeeded {
+                    self.success[i]
+                } else {
+                    self.fail[i]
+                };
+            }
+        }
+        score
+    }
 }
 
 #[derive(Debug)]
 pub(super) struct Solution {
     scoring: Scoring,
-    optimal: FnvHashMap<State, Answer>,
+    optimal: FnvHashMap<State, ArrayVec<Answer, 3>>,
     count: u8,
 }
 
@@ -124,8 +138,11 @@ impl Solution {
 
                 for index in available_choices {
                     let (success_state, fail_state) = state.transition(index);
-                    let success_score = self.lookup(&success_state).map(|a| a.score).unwrap_or(0.0);
-                    let fail_score = self.lookup(&fail_state).map(|a| a.score).unwrap_or(0.0);
+                    let success_score = self
+                        .lookup(&success_state)
+                        .map(|a| a[0].score)
+                        .unwrap_or(0.0);
+                    let fail_score = self.lookup(&fail_state).map(|a| a[0].score).unwrap_or(0.0);
 
                     let score = prob_success * (self.scoring.success[index] + success_score)
                         + prob_fail * (self.scoring.fail[index] + fail_score);
@@ -133,13 +150,13 @@ impl Solution {
                     scores.push(Answer { index, score });
                 }
 
-                scores.sort_by(|a, b| {
+                scores.sort_by(|b, a| {
                     a.score
                         .partial_cmp(&b.score)
                         .unwrap()
                         .then(b.index.cmp(&a.index))
                 });
-                self.optimal.insert(state, scores.pop().unwrap());
+                self.optimal.insert(state, scores);
             }
 
             // odometer to next `remaining`; this is ugly but meh
@@ -158,9 +175,9 @@ impl Solution {
         }
     }
 
-    fn lookup(&self, state: &State) -> Option<Answer> {
+    fn lookup(&self, state: &State) -> Option<ArrayVec<Answer, 3>> {
         if let Some(answer) = self.optimal.get(&state) {
-            return Some(*answer);
+            return Some(answer.clone());
         }
         assert!(
             state.available_choices().is_empty(),
@@ -170,9 +187,14 @@ impl Solution {
         None
     }
 
-    pub(super) fn optimal_choice(&self, state: &GameState) -> Option<Answer> {
+    pub(super) fn sorted_choices(&self, state: &GameState) -> Option<ArrayVec<Answer, 3>> {
+        let partial_score = self.scoring.eval_partial(state);
         let state = State::from(state);
-        self.lookup(&state)
+        let mut answer = self.lookup(&state)?;
+        for a in &mut answer {
+            a.score += partial_score;
+        }
+        Some(answer)
     }
 
     pub(super) fn simulate_once(&self, start: &GameState, rng: &mut ThreadRng) -> [u8; 3] {
@@ -187,7 +209,7 @@ impl Solution {
         while !state.available_choices().is_empty() {
             // lookup is guaranteed to succeed as long as we have at least one
             // available choice
-            let best = self.lookup(&state).unwrap();
+            let best = self.lookup(&state).unwrap()[0];
             let success = state.update(best.index, rng);
             if success {
                 scores[best.index] += 1;
