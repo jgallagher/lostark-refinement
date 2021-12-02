@@ -62,7 +62,7 @@ impl epi::App for TemplateApp {
     /// Called once before the first frame.
     fn setup(
         &mut self,
-        _ctx: &egui::CtxRef,
+        ctx: &egui::CtxRef,
         frame: &mut epi::Frame<'_>,
         _storage: Option<&dyn epi::Storage>,
     ) {
@@ -72,6 +72,18 @@ impl epi::App for TemplateApp {
         if let Some(storage) = _storage {
             *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
         }
+
+        let mut fonts = egui::FontDefinitions::default();
+        fonts.family_and_size.insert(
+            egui::TextStyle::Body,
+            (egui::FontFamily::Proportional, 16.0),
+        );
+        ctx.set_fonts(fonts);
+
+        let mut visuals = egui::Visuals::light();
+        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
+        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
+        ctx.set_visuals(visuals);
 
         // spawn worker thread
         let worker_thread = ThreadHandle::spawn(
@@ -157,10 +169,8 @@ impl epi::App for TemplateApp {
                             ui.group(|ui| {
                                 ui.vertical(|ui| {
                                     ui.heading("Help / About");
-                                    ui.label("\u{2022} Set point values for success/failure for each row in `Weights`");
-                                    ui.label("  above");
-                                    ui.label("\u{2022} Reported scores are the expected values based on current");
-                                    ui.label("  progress and chosen weights");
+                                    ui.label("\u{2022} Set point values for success/failure for each row in `Weights` above");
+                                    ui.label("\u{2022} Reported scores are the expected values based on current progress and chosen weights");
                                     ui.label("\u{2022} Follow the suggested selections (green highlit skill)");
                                     ui.label("\u{2022} Update the top section with the in-game result (+1 or failure)");
                                     ui.label("\u{2022} The right section shows the 10 most probable final outcomes");
