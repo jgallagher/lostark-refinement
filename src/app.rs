@@ -22,15 +22,30 @@ struct SimResult {
     score: f64,
 }
 
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+#[derive(PartialEq)]
+enum LightOrDarkMode {
+    Light,
+    Dark,
+}
+
+impl Default for LightOrDarkMode {
+    fn default() -> Self {
+        Self::Light
+    }
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
+#[derive(Default)]
 pub struct TemplateApp {
     weights: Weights,
     selected_preset: usize,
     simulation: Simulation,
     sim_tries: Option<u32>,
     game_state: GameState,
+    light_or_dark: LightOrDarkMode,
 
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -40,18 +55,16 @@ pub struct TemplateApp {
     worker_thread: Option<worker_thread::ThreadHandle>,
 }
 
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            weights: Weights::default(),
-            selected_preset: 0,
-            simulation: Simulation::default(),
-            sim_tries: None,
-            game_state: GameState::default(),
-            current_scoring: None,
-            worker_thread: None,
-        }
-    }
+fn set_light_mode(ctx: &egui::CtxRef) {
+    let mut visuals = egui::Visuals::light();
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
+    ctx.set_visuals(visuals);
+}
+
+fn set_dark_mode(ctx: &egui::CtxRef) {
+    let visuals = egui::Visuals::dark();
+    ctx.set_visuals(visuals);
 }
 
 impl epi::App for TemplateApp {
@@ -80,11 +93,6 @@ impl epi::App for TemplateApp {
         );
         ctx.set_fonts(fonts);
 
-        let mut visuals = egui::Visuals::light();
-        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
-        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::BLACK);
-        ctx.set_visuals(visuals);
-
         // spawn worker thread
         let worker_thread = ThreadHandle::spawn(
             self.weights.parse(),
@@ -111,9 +119,15 @@ impl epi::App for TemplateApp {
             simulation,
             sim_tries,
             game_state,
+            light_or_dark,
             current_scoring,
             worker_thread,
         } = self;
+
+        match light_or_dark {
+            LightOrDarkMode::Light => set_light_mode(ctx),
+            LightOrDarkMode::Dark => set_dark_mode(ctx),
+        }
 
         let worker_thread = worker_thread.as_ref().unwrap();
 
@@ -122,15 +136,18 @@ impl epi::App for TemplateApp {
         // Tip: a good default choice is to just keep the `CentralPanel`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
-        #[cfg(not(target_arch = "wasm32"))]
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
+                #[cfg(not(target_arch = "wasm32"))]
                 egui::menu::menu(ui, "File", |ui| {
                     if ui.button("Quit").clicked() {
                         _frame.quit();
                     }
                 });
+
+                ui.selectable_value(light_or_dark, LightOrDarkMode::Light, "Light Mode");
+                ui.selectable_value(light_or_dark, LightOrDarkMode::Dark, "Dark Mode");
             });
         });
 
